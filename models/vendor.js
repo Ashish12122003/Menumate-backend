@@ -36,7 +36,7 @@ const vendorSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: ["vendor", "admin"],
-      default: "vendor"
+      default: "admin"
     },
        managesFoodCourt: {
         type: mongoose.Schema.Types.ObjectId,

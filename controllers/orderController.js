@@ -1,4 +1,5 @@
 // controllers/orderController.js
+const MenuItem = require('../models/menuItem');
 const mongoose = require('mongoose');
 const Order = require('../models/order');
 const ParentOrder = require('../models/parentOrder');
@@ -211,13 +212,12 @@ const getOrdersForVendorShop = async (req, res, next) => {
         const { shopId } = req.params;
         const vendorId = req.vendor._id;
 
-        // Security Check (remains the same)
+        // Security Check
         const shop = await Shop.findById(shopId);
         if (!shop || shop.owner.toString() !== vendorId.toString()) {
             return res.status(403).json({ success: false, message: 'Access denied. You do not own this shop.' });
         }
-
-        // --- IMPROVEMENT 4: ADD PAGINATION ---
+        
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
@@ -225,46 +225,25 @@ const getOrdersForVendorShop = async (req, res, next) => {
         const query = { shop: shopId };
         if (req.query.status) { query.orderStatus = req.query.status; }
 
-        // --- NEW ROBUST LOGIC (MANUAL POPULATION) ---
-
-        // 1. Fetch the orders without populating, using .lean() for speed.
-        // .lean() returns plain JavaScript objects, not full Mongoose documents.
-        const orders = await Order.find(query).sort({ createdAt: -1 }).lean();
-
-        // 2. Collect all unique user IDs from the orders
-        const userIds = [...new Set(orders.map(order => order.user))];
-
-        // 3. Fetch all the required users in a single, efficient database query
-        const users = await User.find({ '_id': { $in: userIds } }).select('name phone').lean();
-
-        // 4. Create a map for easy lookup (e.g., { 'userId1': {name: 'Rohan'}, 'userId2': {name: 'Priya'} })
-        const userMap = users.reduce((acc, user) => {
-            acc[user._id] = user;
-            return acc;
-        }, {});
-
-        // 5. Manually combine the user data with the order data
-        const populatedOrders = orders.map(order => {
-            return {
-                ...order,
-                user: userMap[order.user] || null // Attach the user object
-            };
-        });
-
-        // ---------------------------------------------
+        // The fix: Populate the 'table' and 'user' fields
+        const orders = await Order.find(query)
+                                  .populate('table', 'tableNumber') // Populate the table object with its tableNumber
+                                  .populate('user', 'name phone') // Populate the user object with name and phone
+                                  .sort({ createdAt: -1 })
+                                  .lean();
 
         res.status(200).json({
             success: true,
-            count: populatedOrders.length,
-            data: populatedOrders
+            count: orders.length,
+            data: orders
         });
 
     } catch (error) {
-        // We need to import the User model for this to work
         console.error("Get Orders for Vendor Error:", error);
         next(error);
     }
 };
+
 
 
 module.exports = { placeOrder, getMyOrders, getOrderById, updateOrderStatusByVendor, getOrdersForVendorShop };

@@ -1,5 +1,6 @@
 // controllers/foodCourtAdminController.js
 const Shop = require('../models/shop');
+const FoodCourt = require('../models/foodCourt');
 
 // @desc    Get all shops with 'Pending' status for the manager's food court
 // @route   GET /api/manager/pending-shops
@@ -113,6 +114,18 @@ const getFoodCourtAnalytics = async (req, res, next) => {
         next(error);
     }
 };
+
+const getAllFoodCourts = async (req, res, next) => {
+    try {
+        const foodCourts = await FoodCourt.find();
+        res.status(200).json({
+            success: true,
+            foodCourts: foodCourts
+        });
+    } catch (error) {
+        next(error);
+    }
+};
 // ----------------------------
 
 
@@ -120,5 +133,6 @@ const getFoodCourtAnalytics = async (req, res, next) => {
 module.exports = {
     getPendingShops,
     updateShopStatus,
-    getFoodCourtAnalytics
+    getFoodCourtAnalytics,
+    getAllFoodCourts
 };

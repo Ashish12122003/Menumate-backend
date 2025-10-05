@@ -47,26 +47,39 @@ const checkTablePermissions = async (shopId, currentUser) => {
 const createTableForShop = async (req, res) => {
     try {
         const { shopId } = req.params;
-        const { tableNumber } = req.body;
-
-        // 1. Perform the new, smart authorization check
+        const { tableNumber, qrIdentifier, tableNumbers } = req.body;
+        
         const authCheck = await checkTablePermissions(shopId, req.vendor);
         if (!authCheck.authorized) {
             return res.status(authCheck.status).json({ success: false, message: authCheck.message });
         }
         
-        const { shop } = authCheck; // Get the shop from the auth check
+        let createdTables = [];
 
-        // 2. If authorized, create the table
-        const newTable = await Table.create({
-            shop: shopId,
-            tableNumber: tableNumber || 'General QR'
-        });
+        if (tableNumbers && Array.isArray(tableNumbers)) {
+            // Bulk creation logic
+            const tablesToCreate = tableNumbers.map(t => ({
+                shop: shopId,
+                tableNumber: t.tableNumber,
+                qrIdentifier: t.qrIdentifier
+            }));
+            createdTables = await Table.insertMany(tablesToCreate);
+        } else if (tableNumber && qrIdentifier) {
+            // Single table creation logic
+            const newTable = await Table.create({
+                shop: shopId,
+                tableNumber: tableNumber,
+                qrIdentifier: qrIdentifier
+            });
+            createdTables.push(newTable);
+        } else {
+            return res.status(400).json({ success: false, message: "A tableNumber and qrIdentifier are required." });
+        }
 
         res.status(201).json({
             success: true,
-            message: `Table/QR created successfully for ${shop.name}`,
-            data: newTable
+            message: `${createdTables.length} QR code(s) created successfully.`,
+            data: createdTables
         });
 
     } catch (error) {
@@ -74,6 +87,7 @@ const createTableForShop = async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
+
 
 // @desc    Get all tables/QRs for a specific shop
 // @route   GET /api/shops/:shopId/tables

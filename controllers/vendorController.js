@@ -50,7 +50,7 @@ const loginVendor = async (req, res, next) => {
             success: true,
             message: "Login successful",
             token,
-            data: { id: vendor._id, name: vendor.name, email: vendor.email }
+            data: { id: vendor._id, name: vendor.name, email: vendor.email , role: vendor.role }
         });
     } catch (error) { next(error); }
 };

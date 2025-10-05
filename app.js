@@ -25,107 +25,112 @@ const registrationRoutes = require("./routes/registrationRoutes");
 dotenv.config();
 
 const app = express();
-app.use(cors())
 
+// ----------------------
+// CORS FIX
+// ----------------------
+// Frontend origin
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// ----------------------
 // socket.io setup
+// ----------------------
 const server = http.createServer(app);
-// We add CORS configuration to allow your frontend to connect.
 const io = new Server(server, {
   cors: {
-    origin: "*", // In production, you should restrict this to your frontend's URL
-    methods: ["GET", "POST"]
+    origin: FRONTEND_URL,
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
+// ----------------------
 // Middlewares
-
+// ----------------------
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Make socket.io instance available in routes
 app.use((req, res, next) => {
   req.io = io;
   next();
-}); 
+});
 
+// ----------------------
 // Database 
+// ----------------------
 connectDB();
 
+// ----------------------
 // Routes
+// ----------------------
 app.get("/", (req, res) => res.json({
   success: true,
   message: "Welcome to MenuMate API v2 (Multi-Shop Ready!)"
 }));
 
-// Mount the main routers
 app.use("/api/public", publicRoutes);
 app.use("/api/register", registrationRoutes);
-
 app.use("/api/users", userRoute);
-
 app.use("/api/vendor", vendorRoute);
 app.use("/api/vendor/orders", vendorOrderRoutes);
-
 app.use("/api/shops", shopRoutes);
-
 app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
-
 app.use("/api/admin", adminRoutes); 
 app.use("/api/manager", foodCourtAdminRoutes); 
 
-
-//SOCKET.IO CONNECTION LOGIC ---
+// ----------------------
+// SOCKET.IO CONNECTION LOGIC
+// ----------------------
 io.on('connection', (socket) => {
   console.log('✅ A client connected:', socket.id);
  
-  // Logic for a vendor to join a room specific to their shop
+  // Vendor joins their shop room
   socket.on('joinShopRoom', (shopId) => {
     socket.join(shopId);
     console.log(`💻 Client ${socket.id} joined room ${shopId}`);
   });
 
-  // --- NEW LOGIC for customers to join their own private room ---
+  // Customer joins their private room
   socket.on('joinUserRoom', (userId) => {
     socket.join(userId);
     console.log(`👤 Customer client ${socket.id} joined room ${userId}`);
   }); 
  
-   // --- FINAL, ROBUST WAITER CALL LOGIC ---
-    // This version works for BOTH Single Shops and Food Courts
-    socket.on('call_waiter_request', (data) => {
-        // The data payload can be:
-        // V1 (Single Shop): { shopId: '...', tableNumber: '...' }
-        // V2 (Food Court):  { targetShopId: '...', tableNumber: '...' }
-
-        // This line intelligently determines the destination.
-        // It prioritizes 'targetShopId' but falls back to 'shopId'.
-        const destinationShopId = data.targetShopId || data.shopId;
-
-        if (destinationShopId && data.tableNumber) {
-            // Forward the alert to the correct shop's room
-            io.to(destinationShopId).emit('waiter_call_alert', {
-                tableNumber: data.tableNumber,
-                time: new Date()
-            });
-            console.log(`🔔 Emitted 'waiter_call_alert' for table ${data.tableNumber} to room ${destinationShopId}`);
-        } else {
-            console.log("Waiter call received with missing shop ID data:", data);
-        }
-    });
-
+  // Waiter call logic
+  socket.on('call_waiter_request', (data) => {
+    const destinationShopId = data.targetShopId || data.shopId;
+    if (destinationShopId && data.tableNumber) {
+      io.to(destinationShopId).emit('waiter_call_alert', {
+        tableNumber: data.tableNumber,
+        time: new Date()
+      });
+      console.log(`🔔 Emitted 'waiter_call_alert' for table ${data.tableNumber} to room ${destinationShopId}`);
+    } else {
+      console.log("Waiter call received with missing shop ID data:", data);
+    }
+  });
 
   socket.on('disconnect', () => {
     console.log('❌ Client disconnected:', socket.id);
   });
 });
 
-
+// ----------------------
 // Image upload error handling
+// ----------------------
 app.use((err, req, res, next) => {
   console.error(err.stack);
 
-  // Handle multer file upload errors
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
       success: false,
@@ -140,7 +145,6 @@ app.use((err, req, res, next) => {
     });
   }
 
-  // Handle Cloudinary errors
   if (err.message && err.message.includes('cloudinary')) {
     return res.status(400).json({
       success: false,
@@ -154,10 +158,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-
-
-// Server
+// ----------------------
+// Start server
+// ----------------------
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => // Use 'server', not 'app'
-  console.log(`🚀 Server with real-time support running on http://localhost:${PORT}`)
+server.listen(PORT, () =>
+  console.log(`🚀 Server running on http://localhost:${PORT}`)
 );
