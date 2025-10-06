@@ -117,7 +117,19 @@ const getTablesForShop = async (req, res) => {
     }
 };
 
+const deleteTableForShop = async (req, res) => {
+  try {
+    const { shopId, qrIdentifier } = req.params;
+    await Table.findOneAndDelete({ shop: shopId, qrIdentifier });
+    res.status(200).json({ message: 'Table deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to delete table' });
+  }
+};
+
 module.exports = {
     createTableForShop,
-    getTablesForShop
+    getTablesForShop,
+    deleteTableForShop
 };
