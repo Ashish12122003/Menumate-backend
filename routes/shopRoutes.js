@@ -16,6 +16,10 @@ const menuRouter = require('./menuRoutes');
 const categoryRouter = require('./categoryRoutes');
 const tableRouter = require('./tableRoutes');
 
+
+// Forward any requests like /:shopId/review to the reviewRouter
+router.get('/:shopId/reviews', getReviewsForShop);
+
 // Apply the vendor protection middleware to all routes in this file
 router.use(protect);
 
@@ -34,8 +38,7 @@ router.route('/:shopId/upi-qr')
 // Route for a vendor to get all orders for a specific shop
 router.get('/:shopId/orders', getOrdersForVendorShop);
 
-// Forward any requests like /:shopId/review to the reviewRouter
-router.get('/:shopId/reviews', getReviewsForShop);
+
 
 // Analytics routes
 router.use('/:shopId/analytics', analyticsRouter);
